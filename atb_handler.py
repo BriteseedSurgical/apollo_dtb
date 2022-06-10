@@ -39,6 +39,13 @@ def query(dtb_connected, query_request, query_received):
 """
 def task_manager(dtb_connected, tasks, command_queue, movement_event, 
                  save_flag, abort_flag, job_hold, job_active):
+    
+    #workflow 
+    #import commands from udp_listener which unpacks the json of commands from MATLAB
+    #index out each command and determine what the command name is 
+    #according to each command write the Matt-code (also appending out the numbers that the user sent)
+    #add each string of Matt-code to new packet to be sent to the arduino uno 
+    
     command_queue.queue.clear() #gzel added to ensure that command queue is cleared before running DTB to ensure no random commands are run
     logger.info("Starting task manager...")
     
@@ -93,7 +100,7 @@ def task_manager(dtb_connected, tasks, command_queue, movement_event,
             save_flag.clear()
         elif command == "ZERO":
             command_queue.put("G10 L20 P2 X0Y0Z0")
-            command_queue.put("G55")
+            command_queue.put("G55")   
         else:
             _ = 0
         #num_tracker = num_tracker-1
@@ -143,7 +150,19 @@ def udp_listener(dtb_connected, PORT, command_queue, movement_event, save_flag,
                 coords = [float(a) for a in data.decode().split(',')[1:]];
                 logger.debug("JOG received: {}".format(coords))
                 jog_hold.clear()
-                command_queue.put("$J=G91X{}Y{}Z{}F800".format(coords[0], coords[1], coords[2]))     
+                command_queue.put("$J=G91X{}Y{}Z{}F800".format(coords[0], coords[1], coords[2])) 
+            elif "MS" in data.decode():    
+                coords = [float(a) for a in data.decode().split(',')[1:]];
+                logger.debug("MS received: {}".format(coords))
+                jog_hold.clear()
+                command_queue.put("$J=G90X{}Y{}F500".format(coords[0], coords[1]) 
+                logger.info("M SCAN END")
+            elif "IS" in data.decode():    
+                coords = [float(a) for a in data.decode().split(',')[1:]];
+                logger.debug("IS received: {}".format(coords))
+                jog_hold.clear()
+                command_queue.put("$J=G91X{}Y{}F500".format(coords[0], coords[1]) 
+                logger.info("I SCAN END") 
             elif data.decode() == 'HOLD':
                 command_queue.put(chr(0x85))
                 jog_hold.set()
