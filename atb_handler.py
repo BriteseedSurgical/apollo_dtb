@@ -13,6 +13,7 @@ import re           # Regex module for text matching
 
 UDP_LISTENER_IP = "0.0.0.0" # IP addresses to listen to (0.0.0.0 = any IP address)
 UDP_LISTENER_PORT = 8020    # UDP port for the DTB
+#need to update
 
 
 """
@@ -88,7 +89,7 @@ def task_manager(dtb_connected, tasks, command_queue, movement_event,
             command_queue.put("G91 G1 X{} Y{} Z{} F{}".format(
                 field['x'], field['y'], field['z'], field['f']))
             #command_queue.put("G4P0") # code maked DTB stop in between each run
-            #movement_event.wait() # code makes DTb stop in between each run
+            #movement_event.wait() # code makes DTB stop in between each run
             logger.info("INC END")
         elif command == "WAIT":
             time.sleep(field['duration'])
