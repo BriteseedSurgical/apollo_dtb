@@ -3510,13 +3510,17 @@ set(handles.MotorBtnStart, 'Enable', status);
 set(handles.MotorBtnGotostart, 'Enable', status);
 
 function calculate_scan_stepsize(handles, axis)
+% no change
 %calculate the scan step size and display in text box
+% note: the static motion is set to determine points along a tissue, reach point A, stop, take data, move to point B, stop, take data etc. 
+%this function determines the step sizes the motors should move to reach point A/B/C...
 
 if axis=="X" || axis=="x"
     %convert the input string to a double
     if str2double(get(handles.MotorInputXSteps, 'String')) >1
         val = (str2double(get(handles.MotorInputXStepSize,'String')))/(str2double(get(handles.MotorInputXSteps, 'String'))-1);
         %write stepsize to text box
+        %% look into what text box is, is it part of GUI or data sent to arduino
         set(handles.MotorTextXSize, 'String',round(val,2));
     else
         set(handles.MotorTextXSize, 'String', get(handles.MotorInputXStepSize,'String'));
@@ -3533,7 +3537,7 @@ end
 
 function check_error(handles, hObject, type)
    %check for errors in
-   
+   % no change
 if type == "i" || type=="I" || type == "integer" || type =="Integer" || type=="int" || type == "Int"
     %check for integer
     if ~isnan(str2double(get(hObject,'String')))
@@ -3557,6 +3561,7 @@ if type == "i" || type=="I" || type == "integer" || type =="Integer" || type=="i
 end
 
 function printToFeedbackBox(handles, inputString)
+% no change
 handles.MotorFeedback.String = cellstr(handles.MotorFeedback.String);
 % handles.MotorFeedback.String{end+1} = inputString;
 t = now;
@@ -3567,13 +3572,16 @@ inputString = "["+time1+"] " +inputString;
 handles.MotorFeedback.String = vertcat({inputString}, handles.MotorFeedback.String);
 
 function waitForTime(waitTime)
+% no change
+% does not receive from arduino
+
 %timer 
 T = timer('TimerFcn',@(~,~)disp('Timer Fired.'),'StartDelay',waitTime);    
 start(T);
 wait(T);
 
 function Jog(handles, axis,  direction, startStop)
-    
+% receives from arduino    
 %Workflow:
 %   1.Check start or stop
 %   2. set direction
@@ -3581,14 +3589,32 @@ function Jog(handles, axis,  direction, startStop)
 
 
 if startStop == "start"
-    c = "J "+axis+string(direction)+sprintf("\n")
+    %    c = "J "+axis+string(direction)+sprintf("\n")
+    coords = handles.MotorCoords;
     if direction >0 
         d = "+";
+        if srtcmpi(axis,x)
+            c = "JOG,1,0,0";
+            handles.MotorCoords = coords + [1,0];
+        elseif strcmpi(axis,y)
+            c = "JOG,0,1,0";
+            handles.MotorCoords = coords + [0,1];
+        end
+    end
     elseif direction <0
         d = "-";
+        if srtcmpi(axis,x)
+            c = "JOG,-1,0,0";
+            handles.MotorCoords = coords + [-1,0];
+        elseif strcmpi(axis,y)
+            c = "JOG,0,-1,0";
+            handles.MotorCoords = coords + [0,-1];
+        end
     end
     printToFeedbackBox(handles, "Jogging in "+d+axis+"direction");
-    fwrite(handles.MotorSerial,c);
+%    fwrite(handles.MotorSerial,c);
+%check to see which one to do (up v down)
+     fprintf(handles.MotorSerial,c);
     
     waitForTime(1);
     if handles.MotorSerial.BytesAvailable ~=0
@@ -3597,16 +3623,18 @@ if startStop == "start"
         
 elseif startStop == "stop"
     printToFeedbackBox(handles, "Stopping Jog");
-    fwrite(handles.MotorSerial, newline);
+%   fwrite(handles.MotorSerial, newline);
+    fwrite(handles.MotorSerial, "STOP");
     waitForTime(0.5);
     %receive ACK
-    received = fgets(handles.MotorSerial);
-    if handles.MotorSerial.BytesAvailable
-        r = fgets(handles.MotorSerial);
-    end
+    %received = fgets(handles.MotorSerial);
+    %if handles.MotorSerial.BytesAvailable
+    %    r = fgets(handles.MotorSerial);
+    %end
 end
 
 function moveMotorDistance(handles, moveAxis, moveDir)
+% receives from arduino 
 
 %Worflow:
 %   0. Check motor connection
@@ -3617,13 +3645,15 @@ function moveMotorDistance(handles, moveAxis, moveDir)
 
 if handles.MotorSerial.Status == 'open'
     fprintf(handles.MotorSerial, "C "+moveAxis+sprintf('\n'));   %get X
-    waitForTime(0.25);    
-    received = fgets(handles.MotorSerial);      %read response
-    r = split(received, sprintf('\n'));                  %parse response
-    currentX =  r(1);
+    %waitForTime(0.25);    
+    %received = fgets(handles.MotorSerial);      %read response
+    %r = split(received, sprintf('\n'));                  %parse response
+    %currentX =  r(1);
     %----
     absLocation = string(str2double(currentX) + moveDir*handles.moveSize);
-    fprintf(handles.MotorSerial, "M "+moveAxis +absLocation  + sprintf('\n'));
+      %important is abslocation added to what want to move by?
+    %fprintf(handles.MotorSerial, "M "+moveAxis +absLocation  + sprintf('\n'));
+    fprintf(handles.MotorSerial, "M,moveAxis,absLocation");  %+ sprintf('\n'));
     waitForTime(0.25);
     received = fgets(handles.MotorSerial);      %read response/dump response
     
@@ -3636,7 +3666,10 @@ end
 %%Beginning of Callbacks
 
 % --- Executes on button press in MotorBtnHome.
+
 function MotorBtnHome_Callback(hObject, eventdata, handles)
+% receives from arduino
+
 % hObject    handle to MotorBtnHome (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -3651,12 +3684,16 @@ if handles.MotorSerial.Status == 'open'
         printToFeedbackBox(handles, "Attempting to Home... Please wait up to 30 sec for Confirmation");
         %home the system
         waitForTime(0.5);
-        fprintf(handles.MotorSerial,strcat('H',sprintf('\n')));
-%         waitForTime(30);
+        fwrite(handles.MotorSerial, "HOME");
+%        fprintf(handles.MotorSerial,strcat('H',sprintf('\n')));
+         waitForTime(30);
         while handles.MotorSerial.BytesAvailable ==0
+      % no longer getting confimation of HOMING can update to receive confirmation
             %wait for serial ACK
-        end
+%        end
         received = fgets(handles.MotorSerial);
+        %initializing internal coord system
+        handles.MotorCoords = [0,0];
         printToFeedbackBox(handles, sprintf('Home Status: %s', received)); %TBD remove trailing "\n"
 else
     printToFeedbackBox(handles, "Motor Not Connected. Click Connect.");
@@ -3856,7 +3893,10 @@ end
 
 
 % --- Executes on button press in MotorBtnConnect.
+
 function MotorBtnConnect_Callback(hObject, eventdata, handles)
+% receives from arduino
+
 % hObject    handle to MotorBtnConnect (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -3864,6 +3904,7 @@ function MotorBtnConnect_Callback(hObject, eventdata, handles)
 % TBD: May be able to add 'I' case in firmware to acknowledge communication
 
 %   Acquire the selected serial port
+% add raspi port as an option
 motorPort       = handles.MotorDropdownSerialPort ;
 allItems        = cellstr(motorPort.String);                    % A cell array of all strings in the popup.
 selectedIndex   = motorPort.Value;                % An integer saying which item has been selected.
@@ -3872,6 +3913,7 @@ selectedPort    = string(allItems{selectedIndex});
 
 %Akshay addition
 stopasync(handles.serialport);
+%stopping port with briteseed device
 %end akshay addition
 
 %  Check for No port selection
@@ -3891,30 +3933,36 @@ stopasync(handles.serialport);
         wait(T);
         
         %send home query 'C' is info request, 'H" is home
-        fprintf(handles.MotorSerial,strcat('C H','\n'));                    %check connection by probing 'Home' status
-        T = timer('TimerFcn',@(~,~)disp('Timer Fired.'),'StartDelay',0.5);  %wait for delay
-        start(T);
-        wait(T);
+        %fprintf(handles.MotorSerial,strcat('C H','\n'));                    %check connection by probing 'Home' status
+        % no work for new system
+        %T = timer('TimerFcn',@(~,~)disp('Timer Fired.'),'StartDelay',0.5);  %wait for delay
+        %start(T);
+        %wait(T);
         
+        fwrite(handles.MotorSerial,"HOME");
         %read serial
+        %update to receive ok from arduino
+        % update to get ok from raspi
         received = fgets(handles.MotorSerial);
         
         %can receive one of two valid responses
-        if received==strcat("FALSE", sprintf("\n"))|| received==strcat("TRUE",sprintf("\n"))
-            printToFeedbackBox(handles, "Success, Motor Connected.") 
-            printToFeedbackBox(handles, strcat("Home Status: ", received))
+        %if received==strcat("FALSE", sprintf("\n"))|| received==strcat("TRUE",sprintf("\n"))
+        if strcmpi(received,'ok')
+            printToFeedbackBox(handles, "Success, Motor Connected.") ;
+            printToFeedbackBox(handles, strcat("Home Status: HOMED"));
             %enable the buttons
             EnableMotorButtons(handles, 'on');
         else
             printToFeedbackBox(handles, "Error: Motor Not Connected") 
-            printToFeedbackBox(handles, strcat("Response: ", received)) 
+            printToFeedbackBox(handles, strcat("Response: NOT HOMED")) 
         end
 %         fclose(handles.MotorSerial); %remove after , and put 'onclose' function 
     end  
 
 %Akshay Addition
 readasync(handles.serialport);
-%end akshay addition    
+%end akshay addition 
+%reestablish device port
 guidata(hObject,handles);
 
 
@@ -4038,6 +4086,9 @@ function MotorInputXStepSize_KeyPressFcn(hObject, eventdata, handles)
 
 % --- Executes on button press in MotorBtnGotostart.
 function MotorBtnGotostart_Callback(hObject, eventdata, handles)
+% needs to send motor information to raspberry pi as JSON in this function 
+% receives from arduino
+
 % hObject    handle to MotorBtnGotostart (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -4048,17 +4099,18 @@ function MotorBtnGotostart_Callback(hObject, eventdata, handles)
 if handles.MotorSerial.Status == "open"
     %serial is actively connected
     printToFeedbackBox(handles, "Motor Control Status: Connected");
-    printToFeedbackBox(handles, "Checking Home Status...");
+%    printToFeedbackBox(handles, "Checking Home Status...");
 
     %check if homed
-    fprintf(handles.MotorSerial,strcat('C H',sprintf('\n')));  
-    waitForTime(0.5);
-
+%    fprintf(handles.MotorSerial,strcat('C H',sprintf('\n')));  
+%    waitForTime(0.5);
+    fwrite(handles.MotorSerial,"HOME");
     %received
     received = fgets(handles.MotorSerial); %strip the newline
     printToFeedbackBox(handles, sprintf('Home Status: %s', received));
 
-    if received==strcat("FALSE", sprintf("\n"))
+    %if received==strcat("FALSE", sprintf("\n"))
+    if ~strmcpi(received,'ok');
         printToFeedbackBox(handles, "Test Situation: Setting Home Flag");
         
         %---Test Region
@@ -4073,31 +4125,51 @@ if handles.MotorSerial.Status == "open"
         %--- Remove comments for production
         printToFeedbackBox(handles, "Attempting to Home... Please wait up to 30 sec for Confirmation");
         %home the system
-        fprintf(handles.MotorSerial,strcat('H',sprintf('\n')));
+        %fprintf(handles.MotorSerial,strcat('H',sprintf('\n')));
+        fwrite(handles.MotorSerial, "HOME");
         %wait for feedback ack "OK"
         while handles.MotorSerial.BytesAvailable == 0 
             %wait for ACK
         end
-%         waitForTime(30);
+         waitForTime(30);
         received = fgets(handles.MotorSerial);
-        printToFeedbackBox(handles, sprintf('Home Status: %s', received)); %TBD remove trailing "\n"
+        if strcmpi(received,'ok')l
+          test = 'HOMED';
+          printToFeedbackBox(handles, sprintf('Home Status: %s', test)); %TBD remove trailing "\n"
+          handles.MotorCoords = [0,0];
+        else
+          printToFeedbackBox(handles,"still not HOMED");
+        end
         %----Remove comments for production / end
             
-    elseif received==strcat("TRUE",sprintf("\n"))
+%    elseif received==strcat("TRUE",sprintf("\n"))
+    elseif strcmpi(received,'ok')
         printToFeedbackBox(handles, "System Homed.")
+        handles.MotorSerial = [0,0];
     end
 
     %System is now homed, send to start position
         printToFeedbackBox(handles, "Moving to Central Position");
-        fprintf(handles.MotorSerial, strcat('M Y0 X286 Y-40','\n'));
+        % need to update start position to new coordinates according to G code 
+        fprintf(handles.MotorSerial,"MS,286,0");
+        waitForTime(10);
+        fprintf(handles.MotorSerial,"MS,0,-40");
+        %fprintf(handles.MotorSerial, strcat('M Y0 X286 Y-40','\n'));
         
         
-        while handles.MotorSerial.BytesAvailable ==0
+        while handles.MotorSerial.BytesAvailable ==0 % update to receive ok
             %wait for ACK
         end
 
         received = fgets(handles.MotorSerial);
-        printToFeedbackBox(handles, sprintf('Home Status: %s', received)); %TBD remove trailing "\n"
+        if strcmpi(received,'ok')l
+          test = 'MOVEMENT COMPLETED';
+          printToFeedbackBox(handles, sprintf('Status: %s', test)); %TBD remove trailing "\n"
+          handles.MotorCoords = [286,-40];
+        else
+          printToFeedbackBox(handles,"start pos not reached");
+        end
+        %printToFeedbackBox(handles, sprintf('Home Status: %s', received)); %TBD remove trailing "\n"
         
 elseif handles.MotorSerial.Status == 'closed'
     %serial is not actively connected
@@ -4312,20 +4384,21 @@ if handles.MotorSerial.Status == 'open'
     homeStatus = "";
     xPose = "";
     yPose = "";
-    fprintf(handles.MotorSerial, "C H" + sprintf('\n') + "C X" + sprintf('\n') + "C Y"+sprintf('\n'));
-    waitForTime(0.25);
-    received = fgets(handles.MotorSerial);      %read response
-    r = split(received, sprintf('\n'));          %parse response
-    homeStatus =  r(1);
-    received = fgets(handles.MotorSerial);
-    r= split(received, sprintf('\n'));
-    xPose       = r(1);
-    received = fgets(handles.MotorSerial);      %read response
-    r = split(received, sprintf('\n'));          %parse response
-    yPose =  r(1);
+    coords = handles.MotorSerial;
+    %fprintf(handles.MotorSerial, "C H" + sprintf('\n') + "C X" + sprintf('\n') + "C Y"+sprintf('\n'));
+    %waitForTime(0.25);
+    %received = fgets(handles.MotorSerial);      %read response
+    %r = split(received, sprintf('\n'));          %parse response
+    %homeStatus =  r(1);
+    %received = fgets(handles.MotorSerial);
+    %r= split(received, sprintf('\n'));
+    %xPose       = r(1);
+    %received = fgets(handles.MotorSerial);      %read response
+    %r = split(received, sprintf('\n'));          %parse response
+    %yPose =  r(1);
     
-    printToFeedbackBox(handles, "Home Status: "+homeStatus);
-    printToFeedbackBox(handles, "(X,Y) Position: ("+ xPose+","+yPose+")");
+    printToFeedbackBox(handles, sprintf('coords: %f', coords,'\n')); 
+    %printToFeedbackBox(handles, "(X,Y) Position: ("+ xPose+","+yPose+")");
  
     
 else
@@ -4402,12 +4475,13 @@ function mech_scan_iteration(ui_obj,handles,ss)
 % printToFeedbackBox(handles, "Starting Scan");
 %stopasync(handles.serialport);
 stopasync(ss.serialport);
+% stoppingn device com port
 %ss             = handles.output.UserData;
 
 ss.XSteps      = str2double(handles.MotorInputXSteps.String);
 ss.YSteps      = str2double(handles.MotorInputYSteps.String);
-ss.XStepSize   = str2double(handles.MotorTextXSize.String);
-ss.YStepSize   = str2double(handles.MotorTextYSize.String);
+ss.XStepSize   = str2double(handles.MotorTextXSize.String); % x step size for motors over tissue
+ss.YStepSize   = str2double(handles.MotorTextYSize.String); % y step size for motors over tissue
 
 mechanical_scan_active = ss.mechanical_scan_active;
 if mechanical_scan_active
@@ -4422,11 +4496,10 @@ if mechanical_scan_active
         ss.idY                    = 1;
         %message and updates at end of scan
         printToFeedbackBox(handles, "Scan Complete. Returning to Start");
-        command = "M Y"+(ss.StartY)+" X"+(ss.StartX)+"\n";
-        fprintf(ss.MotorSerial,command);
+        %command = "M Y"+(ss.StartY)+" X"+(ss.StartX)+"\n";
+        %fprintf(ss.MotorSerial,command);
+        fprintf(ss.MotorSerial,"MS,%f,%f", ss.StartX,ss.StartY)
         disp(ss.mechanical_scan_active)
-
-
 
     else
         %Ttotal number of scans of not done
@@ -4435,13 +4508,14 @@ if mechanical_scan_active
 
         xoffset =(ss.idX-1)*ss.XStepSize;
         printToFeedbackBox(handles, strcat("Sending to X Step ", string(xoffset)));
-        command = "M X"+string(xoffset+ss.StartX)+sprintf("\n");
+        %command = "M X"+string(xoffset+ss.StartX)+sprintf("\n");
         
         disp('MotorSerial.');
         disp(ss.MotorSerial);
         %refresh connection ? How to?
         
-        fprintf(ss.MotorSerial, command);
+        fprintf(ss.MotorSerial, "MS,%f,0",(xoffset+ss.StartX));
+        %fprintf(ss.MotorSerial, command);
         %fwrite(
 
         
@@ -4450,9 +4524,10 @@ if mechanical_scan_active
         yoffset = (ss.idY-1)*ss.YStepSize;
         %send new position to motor
         printToFeedbackBox(handles, strcat("Sending to Y Step ", string(yoffset)));
-        command = "M Y"+string(yoffset+ss.StartY)+sprintf("\n");
+        %command = "M Y"+string(yoffset+ss.StartY)+sprintf("\n");
         
-        fprintf(ss.MotorSerial,command);
+        fprintf(ss.MotorSerial, "MS,0,%f",(yoffset+ss.StartY));
+        %fprintf(ss.MotorSerial,command);
 
     
         disp('After Motor Y update.');
@@ -4480,26 +4555,33 @@ else
     if ss.MotorSerial.BytesAvailable
         a = fread(ss.MotorSerial); %clear the buffer don't do anything
     end
-    fprintf(ss.MotorSerial, "C X"+'\n');
-    waitForTime(0.25);   %wait half a second
+    %fprintf(ss.MotorSerial, "C X"+'\n'); %% get x value 
+    %waitForTime(0.25);   %wait half a second
     %receive data
-    disp("BYtes Avail")
-    disp(ss.MotorSerial.BytesAvailable)
-    received        = fgets(ss.MotorSerial)
-    receivedSplit   = split(received,sprintf("\n")); %split with newline
-    handles.StartX  = str2double(receivedSplit(1));
-    ss.StartX = str2double(receivedSplit(1));
+    %disp("BYtes Avail")
+    %disp(ss.MotorSerial.BytesAvailable)
+    %received        = fgets(ss.MotorSerial)
+    %receivedSplit   = split(received,sprintf("\n")); %split with newline
+    coords = handles.MotorCoords;
+    Xcoord = coords(1);
+    %handles.StartX  = str2double(receivedSplit(1));
+    handles.StartX = Xcoord;
+    %ss.StartX = str2double(receivedSplit(1));
+    ss.StartX = Xcoord;
     ss.StartX
 
     printToFeedbackBox(handles, "Retrieving Start Position, Y");
-    fprintf(ss.MotorSerial, "C Y"+'\n');
-    waitForTime(0.25); %wait half a second
+    %fprintf(ss.MotorSerial, "C Y"+'\n');
+    %waitForTime(0.25); %wait half a second
     %receive data
-    received        = fgets(ss.MotorSerial);
-    receivedSplit   = split(received,sprintf('\n')); %split with newline
-    handles.StartY  = str2double(receivedSplit(1));
-    ss.StartY = str2double(receivedSplit(1));
-    ss.StartY
+    %received        = fgets(ss.MotorSerial);
+    %receivedSplit   = split(received,sprintf('\n')); %split with newline
+    Ycoord = coords(2);
+    %handles.StartY  = str2double(receivedSplit(1));
+    handles.StartY = Ycoord;
+    %ss.StartY = str2double(receivedSplit(1));
+    ss.StartY = Ycoord;
+    %ss.StartY
 
     ss.idX = 1;
     ss.idY = 1;
@@ -4507,13 +4589,14 @@ else
     
     xoffset = 0;
     printToFeedbackBox(handles, strcat("Sending to X Step ", string(xoffset)));
-    command = "M X"+string(xoffset+ss.StartX)+sprintf("\n");
+    %command = "M X"+string(xoffset+ss.StartX)+sprintf("\n");
             
 %     disp('MotorSerial.');
 %     disp(ss.MotorSerial);
     
-    fprintf(ss.MotorSerial, command);
-    waitForTime(3.0); %wait half a second
+    %fprintf(ss.MotorSerial, command);
+    fprintf(ss.MotorSerial,"MS,%f,0",(xoffset+ss.StartX));
+    %waitForTime(3.0); %wait half a second
     %TBD check for ACK
         
     yoffset = 0;
