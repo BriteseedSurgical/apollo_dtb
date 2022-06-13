@@ -4384,7 +4384,7 @@ if handles.MotorSerial.Status == 'open'
     homeStatus = "";
     xPose = "";
     yPose = "";
-    coords = handles.MotorSerial;
+    coords = handles.MotorCoords;
     %fprintf(handles.MotorSerial, "C H" + sprintf('\n') + "C X" + sprintf('\n') + "C Y"+sprintf('\n'));
     %waitForTime(0.25);
     %received = fgets(handles.MotorSerial);      %read response
