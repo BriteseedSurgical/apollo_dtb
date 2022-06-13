@@ -267,6 +267,7 @@ selection = contents{get(hObject,'Value')};
 % the dropdown list elements, indexed in order. 
 switch selection
     case contents{1} % Move to
+    % update to new starting position for the HSI test bed
         coords = inputdlg({'X (mm)', 'Y (mm)', 'Z (mm)', 'Speed (mm/s)'}, 'Move to...',[1,15],{'40','-62','22,','270'});%% Giselle Addition
         try
             coords = cellfun(@str2double, coords);
