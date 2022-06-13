@@ -12,7 +12,7 @@ import briteseed_process as bp  # Module for sending data to MATLAB
 import re           # Regex module for text matching
 
 UDP_LISTENER_IP = "0.0.0.0" # IP addresses to listen to (0.0.0.0 = any IP address)
-UDP_LISTENER_PORT = 8020    # UDP port for the DTB
+UDP_LISTENER_PORT = 22    # UDP port for the DTB
 #need to update
 
 
