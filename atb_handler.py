@@ -12,7 +12,7 @@ import briteseed_process as bp  # Module for sending data to MATLAB
 import re           # Regex module for text matching
 
 UDP_LISTENER_IP = "0.0.0.0" # IP addresses to listen to (0.0.0.0 = any IP address)
-UDP_LISTENER_PORT = 22    # UDP port for the DTB
+UDP_LISTENER_PORT = 8020    # UDP port for the ATB UPDATE TO NEW ETHERNET
 #need to update
 
 
@@ -131,7 +131,7 @@ def udp_listener(dtb_connected, PORT, command_queue, movement_event, save_flag,
     #end test code
     while dtb_connected.is_set():
         try:
-            data, addr = sock.recvfrom(65535)
+            data, addr = sock.recvfrom(65494) ## currently corresponds to lab computer need to get number of new socket for communciation from lenox to raspi
             if data.decode() == "STOP":
                 logger.info("STOP received")
                 abort_flag.set()
@@ -245,7 +245,7 @@ We also get a logger from the data pipe. This is the standardized logger across 
 tool tracker, and core. Generates a rolling log file with name "Dynamic Test Bed.log"
 """
 
-data_pipe = bp.process("dtb", 0, ["x", "y", "z", "save", "job_status"], "fffii", 5, PORT=8082)
+data_pipe = bp.process("dtb", 0, ["x", "y", "z", "save", "job_status", "dtb_port"], "fffii", 5, PORT=8082)
 logger = bp.logger.get_logger("dtb")
 
 """
