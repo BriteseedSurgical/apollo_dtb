@@ -200,7 +200,7 @@ update_ui(handles);
 
 % Initialize the UDP port for the DTB
 %% update for raspberry pi
-handles.dtb = udp('192.168.1.81', 22);
+handles.dtb = udp('192.168.1.93', 65494);
 handles.dtb.OutputBufferSize = 16192;
 handles.dtb.OutputDatagramPacketSize = 16192;
 fopen(handles.dtb);
