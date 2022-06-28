@@ -553,6 +553,30 @@ code=zeros(20,1);
 code(1:16) = sprintf('%16s','LED_intensity');
 fwrite(handles.serialport,code);
 
+%% Configure the UDP port to receive data from the Raspberry Pi
+% Read the configuration file
+settings.bdh_vars.config = jsondecode(fileread('/home/briteseed_data/pi_config/data_hub_config.json'));                % Decode the JSON file
+
+% Configure the UDP port
+settings.bdh_vars.bdhPort = udp('127.0.0.1', 50256, 'LocalPort', 50256, 'Timeout', 0.0001);
+settings.bdh_vars.bdhPort.InputBufferSize = 400;
+settings.bdh_vars.bdhPort.InputDatagramPacketSize = 80;
+fopen(settings.bdh_vars.bdhPort);
+settings.bdh_vars.last_save_cmd = 0;
+settings.bdh_vars.counter = 0;
+
+% Append external data to realtime column names
+columns_rt = strcat(columns_rt, ',', strjoin(settings.bdh_vars.config.names, ','), '\n');
+
+fmt = settings.bdh_vars.config.format;
+fmt(fmt == 'i' | fmt == 'I' | fmt == 'h' | fmt == 'H') = 'd';
+fmt = strcat("%", split(fmt, ""));
+dataType_rt = strcat(dataType_rt, ',', strjoin(fmt(2:end-1), ',') , '\n');
+settings.bvcolumn = char(columns_rt);
+settings.bvdtype = char(dataType_rt);
+
+settings.external_rt_data = zeros(length(settings.bdh_vars.config.format), 1);
+
 %% Calibration Module
 
 settings.calib_save_parent = 'x15_calib';
