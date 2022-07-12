@@ -273,8 +273,6 @@ while True:
     dtb_connected.clear()
     with command_queue.mutex:
         command_queue.queue.clear()
-        
-    """------------------------ COM PORT CONFIGURATION SUBROUTINE -----------------------"""
     while not dtb_connected.is_set():
         dtb_dev = "/dev/ttyACM0"
         try:
